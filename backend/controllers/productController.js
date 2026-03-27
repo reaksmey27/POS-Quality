@@ -45,7 +45,27 @@ exports.getBySku = asyncHandler(async (req, res) => {
 });
 
 exports.create = asyncHandler(async (req, res) => {
-  const { name, sku, description, price, cost_price, stock, category_id, image, barcode } = req.body;
+  let { name, sku, description, price, cost_price, stock, category_id, image, barcode } = req.body;
+
+  // Sanitize params to null/0 or resolve category name to ID
+  description = description || null;
+  price = price || 0;
+  cost_price = cost_price || 0;
+  stock = stock || 0;
+  image = image || null;
+  barcode = barcode || null;
+
+  // Resolve category name to ID if string received
+  if (typeof category_id === 'string') {
+    const [catRows] = await pool.execute('SELECT id FROM categories WHERE name = ?', [category_id]);
+    if (catRows.length > 0) {
+      category_id = catRows[0].id;
+    } else {
+      throw new AppError(`Category "${category_id}" not found`, 400);
+    }
+  }
+  category_id = category_id || null;
+
   const status = stock > 10 ? 'In Stock' : stock > 0 ? 'Low Stock' : 'Out of Stock';
 
   const [existing] = await pool.execute('SELECT id FROM products WHERE sku = ?', [sku]);
@@ -54,12 +74,12 @@ exports.create = asyncHandler(async (req, res) => {
   const [result] = await pool.execute(
     `INSERT INTO products (name, sku, description, price, cost_price, stock, category_id, image, barcode, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, sku, description || '', price, cost_price || 0, stock || 0, category_id, image || '', barcode || '', status]
+    [name, sku, description, price, cost_price, stock, category_id, image, barcode, status]
   );
 
   await pool.execute(
     'INSERT INTO stock_movements (product_id, type, quantity, notes, user_id) VALUES (?, ?, ?, ?, ?)',
-    [result.insertId, 'initial', stock || 0, 'Initial stock', req.user?.id || null]
+    [result.insertId, 'initial', stock, 'Initial stock', req.user?.id || null]
   );
 
   const [newProduct] = await pool.execute('SELECT * FROM products WHERE id = ?', [result.insertId]);
@@ -68,17 +88,35 @@ exports.create = asyncHandler(async (req, res) => {
 
 exports.update = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { name, description, price, cost_price, stock, category_id, image, barcode } = req.body;
+  let { name, description, price, cost_price, stock, category_id, image, barcode } = req.body;
 
   const [existing] = await pool.execute('SELECT id, stock FROM products WHERE id = ?', [id]);
   if (!existing.length) throw new AppError('Product not found', 404);
 
-  const newStock = stock ?? existing[0].stock;
+  // Sanitize params
+  description = description || null;
+  price = price || 0;
+  cost_price = cost_price || 0;
+  image = image || null;
+  barcode = barcode || null;
+
+  // Resolve category name to ID if string
+  if (typeof category_id === 'string') {
+    const [catRows] = await pool.execute('SELECT id FROM categories WHERE name = ?', [category_id]);
+    if (catRows.length > 0) {
+      category_id = catRows[0].id;
+    } else {
+      throw new AppError(`Category "${category_id}" not found`, 400);
+    }
+  }
+  category_id = category_id || null;
+
+  const newStock = stock !== undefined ? stock : existing[0].stock;
   const status = newStock > 10 ? 'In Stock' : newStock > 0 ? 'Low Stock' : 'Out of Stock';
 
   await pool.execute(
     `UPDATE products SET name=?, description=?, price=?, cost_price=?, stock=?, category_id=?, image=?, barcode=?, status=?, updated_at=NOW() WHERE id=?`,
-    [name, description, price, cost_price || 0, newStock, category_id, image || '', barcode || '', status, id]
+    [name, description, price, cost_price, newStock, category_id, image, barcode, status, id]
   );
 
   const stockDiff = newStock - existing[0].stock;

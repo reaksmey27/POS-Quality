@@ -50,6 +50,32 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'POS API is running', timestamp: new Date().toISOString() });
 });
 
+app.get('/', (req, res) => {
+  res.redirect(301, '/api');
+});
+
+app.get('/api', (req, res) => {
+  res.json({
+    success: true,
+    message: 'POS Point of Sale API v1.0',
+    version: '1.0.0',
+    baseURL: '/api',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth (POST /login, /register)',
+      products: '/api/products',
+      categories: '/api/categories',
+      customers: '/api/customers',
+      orders: '/api/orders',
+      payments: '/api/payments',
+      reports: '/api/reports',
+      uploads: '/uploads'
+    },
+    documentation: 'Check /api/health for server status',
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -65,3 +91,4 @@ app.use((req, res) => {
 app.use(errorMiddleware);
 
 module.exports = app;
+

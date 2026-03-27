@@ -12,11 +12,12 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
-router.use(authMiddleware);
 router.get('/', product.getAll);
 router.get('/low-stock', product.getLowStock);
 router.get('/sku/:sku', product.getBySku);
 router.get('/:id', product.getById);
+
+router.use(authMiddleware);
 router.post('/', roleMiddleware(ROLES.ADMIN, ROLES.MANAGER), upload.single('image'), product.create);
 router.put('/:id', roleMiddleware(ROLES.ADMIN, ROLES.MANAGER), upload.single('image'), product.update);
 router.patch('/:id/stock', roleMiddleware(ROLES.ADMIN, ROLES.MANAGER), product.updateStock);
